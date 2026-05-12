@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EV PlugPoint DIY – Stasiun Pengisian Kendaraan Listrik Yogyakarta</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-text">
+        <div class="brand">EV PlugPoint</div>
+        <div class="sub">Daerah Istimewa Yogyakarta</div>
+      </div>
+    </div>
+    <div class="header-stats">
+      <div class="hstat"><div class="val" id="hstat-total">0</div><div class="lbl">Total SPKLU</div></div>
+      <div class="hstat-divider"></div>
+      <div class="hstat"><div class="val" id="hstat-avail">0</div><div class="lbl">Tersedia</div></div>
+      <div class="hstat-divider"></div>
+      <div class="hstat"><div class="val" id="hstat-kab">5</div><div class="lbl">Kabupaten/Kota</div></div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge"><div class="live-dot"></div>Live Update</div>
+      <button class="btn-refresh" onclick="refreshData()">↺ Refresh</button>
+    </div>
+  </header>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Cari Stasiun</div>
+        <div class="search-wrap">
+          <input type="text" id="search-input" placeholder="Nama stasiun, lokasi..." oninput="filterStations()">
+          <span class="search-icon">🔍</span>
+        </div>
+        <select class="kab-select" id="kab-select" onchange="filterStations()">
+          <option value="">Semua Kabupaten/Kota</option>
+          <option value="Kota Yogyakarta">Kota Yogyakarta</option>
+          <option value="Sleman">Sleman</option>
+          <option value="Bantul">Bantul</option>
+          <option value="Kulon Progo">Kulon Progo</option>
+          <option value="Gunungkidul">Gunungkidul</option>
+        </select>
+        <div class="filter-row">
+          <div class="filter-chip fc-all active" onclick="setFilter('all',this)">🗺 Semua</div>
+          <div class="filter-chip fc-available" onclick="setFilter('available',this)">✅ Tersedia</div>
+          <div class="filter-chip fc-busy" onclick="setFilter('busy',this)">🔄 penuh</div>
+          <div class="filter-chip fc-offline" onclick="setFilter('offline',this)">⛔ Offline</div>
+        </div>
+      </div>
+
+      <div class="summary-bar">
+        <div class="sb-stat"><div class="sb-dot" style="background:var(--green)"></div><span class="sb-num" id="count-avail">0</span>&nbsp;<span class="sb-lbl">Tersedia</span></div>
+        <div class="sb-stat"><div class="sb-dot" style="background:var(--orange)"></div><span class="sb-num" id="count-busy">0</span>&nbsp;<span class="sb-lbl">penuh</span></div>
+        <div class="sb-stat"><div class="sb-dot" style="background:var(--red)"></div><span class="sb-num" id="count-offline">0</span>&nbsp;<span class="sb-lbl">Offline</span></div>
+        <div class="progress-wrap" id="prog-bar">
+          <div class="progress-seg" style="background:var(--green)" id="prog-avail"></div>
+          <div class="progress-seg" style="background:var(--orange)" id="prog-busy"></div>
+          <div class="progress-seg" style="background:var(--red)" id="prog-offline"></div>
+        </div>
+      </div>
+
+      <div class="station-list" id="station-list"></div>
+    </div>
+
+    <!-- MAP -->
+    <div id="map">
+      <div id="map-container"></div>
+
+      <!-- Map Controls -->
+      <div class="map-controls">
+        <div class="map-btn" onclick="map.zoomIn()" title="Zoom In">+</div>
+        <div class="map-btn" onclick="map.zoomOut()" title="Zoom Out">−</div>
+        <div class="map-btn" onclick="fitBounds()" title="Reset View">⊞</div>
+        <div class="map-btn" onclick="toggleSidebar()" title="Toggle Panel">☰</div>
+      </div>
+
+      <!-- Layer Switcher -->
+      <div class="map-layers">
+        <div class="layer-btn active" id="layer-street"    onclick="setLayer('street',this)">🗺 Street</div>
+        <div class="layer-btn"        id="layer-satellite" onclick="setLayer('satellite',this)">🛰 Satelit</div>
+        <div class="layer-btn"        id="layer-dark"      onclick="setLayer('dark',this)">🌙 Dark</div>
+      </div>
+
+      <!-- Legend -->
+      <div class="map-legend" id="map-legend">
+        <div class="legend-item"><div class="legend-dot available"></div>Tersedia</div>
+        <div class="legend-item"><div class="legend-dot busy"></div>penuh</div>
+        <div class="legend-item"><div class="legend-dot offline"></div>Offline</div>
+      </div>
+
+      <!-- Detail Panel -->
+      <div id="detail-panel">
+        <button class="dp-close" onclick="closeDetail()">✕</button>
+        <div id="dp-content"></div>
+      </div>
+    </div>
+
+  </div><!-- /.main -->
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- App Scripts — data must load before app -->
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
