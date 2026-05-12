@@ -1,4 +1,4 @@
-// ── EV PLUGPOINT – app.js ──
+// ── EV PLUGPOINT ──
 
 // ── ICONS ──
 const statusIcon = { available: '⚡', busy: '🔄', offline: '⛔' };
