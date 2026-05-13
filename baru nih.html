@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebGIS Persebaran SPKLU DIY</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: #0d1728;
+      --panel-2: #111d31;
+      --panel-3: #172338;
+      --border: rgba(148, 163, 184, 0.16);
+      --text: #e5edf7;
+      --muted: #7f8ea3;
+      --muted-2: #9ba8ba;
+      --accent: #55d497;
+      --accent-2: #38bdf8;
+      --warning: #f59e0b;
+      --danger: #f87171;
+      --available: #55d497;
+      --busy: #f59e0b;
+      --offline: #f87171;
+      --unknown: #94a3b8;
+      --shadow: 0 18px 45px rgba(0,0,0,0.34);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .shell {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 88px 1fr;
+      background:
+        radial-gradient(circle at top left, rgba(85, 212, 151, 0.13), transparent 34%),
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.10), transparent 28%),
+        var(--bg);
+    }
+
+    .topbar {
+      height: 88px;
+      padding: 16px 22px;
+      display: grid;
+      grid-template-columns: 360px 1fr auto;
+      gap: 18px;
+      align-items: center;
+      background: rgba(8, 17, 31, 0.94);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+      z-index: 1000;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      color: #052e1f;
+      background: linear-gradient(135deg, #70e4b0, #69d6ff);
+      box-shadow: 0 0 28px rgba(85, 212, 151, 0.34);
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.1;
+      letter-spacing: 0.2px;
+      color: #dff7ee;
+    }
+
+    .brand p {
+      margin: 4px 0 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: .15px;
+    }
+
+    .top-stats {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      min-width: 0;
+    }
+
+    .stat-box {
+      min-width: 118px;
+      padding: 0 24px;
+      text-align: center;
+      border-left: 1px solid rgba(148,163,184,.12);
+    }
+
+    .stat-box:first-child { border-left: 0; }
+    .stat-value {
+      display: block;
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--accent);
+      line-height: 1;
+      text-shadow: 0 0 18px rgba(85,212,151,.18);
+    }
+    .stat-label {
+      display: block;
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: .2px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .live-badge, .refresh-btn {
+      border: 1px solid rgba(85,212,151,.16);
+      background: rgba(85,212,151,.10);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .live-badge::before {
+      content: "";
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent);
+      margin-right: 7px;
+      box-shadow: 0 0 12px var(--accent);
+    }
+    .refresh-btn {
+      color: #cbd5e1;
+      background: rgba(15, 23, 42, .78);
+      border-color: rgba(148,163,184,.16);
+      cursor: pointer;
+    }
+    .refresh-btn:hover { border-color: rgba(85,212,151,.45); color: #fff; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      min-height: 0;
+    }
+
+    aside {
+      background: rgba(10, 20, 35, 0.98);
+      border-right: 1px solid var(--border);
+      box-shadow: 18px 0 46px rgba(0,0,0,.22);
+      padding: 18px 18px 20px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(85,212,151,.45) rgba(15,23,42,.45);
+      z-index: 900;
+    }
+
+    aside::-webkit-scrollbar { width: 8px; }
+    aside::-webkit-scrollbar-track { background: rgba(15,23,42,.45); }
+    aside::-webkit-scrollbar-thumb { background: rgba(85,212,151,.45); border-radius: 999px; }
+
+    .panel-title {
+      margin: 0 0 14px 0;
+      font-size: 14px;
+      line-height: 1.2;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #aeb9c9;
+    }
+
+    .filter-card {
+      background: linear-gradient(180deg, rgba(17,29,49,.92), rgba(11,22,39,.92));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 14px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.14);
+    }
+
+    .form-group { margin-bottom: 11px; }
+    .form-group:last-child { margin-bottom: 0; }
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: #8e9cb0;
+    }
+
+    select, input {
+      width: 100%;
+      min-height: 39px;
+      padding: 10px 12px;
+      border: 1px solid rgba(148,163,184,.14);
+      border-radius: 11px;
+      background: #121f33;
+      color: #dbe7f3;
+      font-size: 13px;
+      font-weight: 400;
+      outline: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    select option {
+      font-weight: 400;
+    }
+
+    input::placeholder { color: #64748b; }
+    select:focus, input:focus {
+      border-color: rgba(85,212,151,.72);
+      box-shadow: 0 0 0 3px rgba(85, 212, 151, 0.11);
+    }
+
+    .search-wrap { position: relative; }
+    .search-wrap input { padding-right: 40px; }
+    .search-wrap::after {
+      content: "🔍";
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      opacity: .78;
+      font-size: 14px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      min-height: 40px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: 900;
+      font-size: 12.5px;
+      transition: .18s ease;
+      letter-spacing: .1px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #55d497, #38bdf8);
+      color: #082019;
+      box-shadow: 0 12px 24px rgba(85,212,151,.18);
+    }
+    .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.04); }
+    .btn-secondary {
+      background: rgba(56,189,248,.12);
+      color: #a9e7ff;
+      border: 1px solid rgba(56,189,248,.22);
+    }
+    .btn-secondary:hover { background: rgba(56,189,248,.18); color: #e0f7ff; }
+    .btn-muted {
+      width: 100%;
+      margin-top: 10px;
+      background: rgba(148,163,184,.09);
+      color: #cbd5e1;
+      border: 1px solid rgba(148,163,184,.12);
+    }
+    .btn-muted:hover { background: rgba(148,163,184,.14); }
+
+    .quick-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 2px 0 13px;
+    }
+    .quick-pill {
+      border: 1px solid rgba(148,163,184,.13);
+      background: rgba(17,29,49,.8);
+      color: #aab7c8;
+      border-radius: 999px;
+      padding: 8px 11px;
+      font-size: 11px;
+      font-weight: 900;
+      cursor: default;
+    }
+    .quick-pill.active { color: var(--accent); border-color: rgba(85,212,151,.45); background: rgba(85,212,151,.10); }
+    .quick-pill.busy { color: #fbbf24; }
+    .quick-pill.offline { color: #fb7185; }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 0 0 12px;
+      border-bottom: 1px solid rgba(148,163,184,.10);
+      margin-bottom: 14px;
+    }
+    .mini-stat {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: #7e8ca0;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .mini-stat b { color: #cbd5e1; font-size: 13px; }
+
+    .info-box {
+      background: rgba(17,29,49,.95);
+      border: 1px solid rgba(85,212,151,.14);
+      border-radius: 16px;
+      padding: 12px 13px;
+      margin: 12px 0 14px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #adb9c9;
+    }
+    .info-box strong { color: #dff7ee; }
+    .info-box span { color: #7f8ea3 !important; }
+
+    .results { margin-top: 14px; }
+    .results h3 {
+      margin: 0 0 10px 0;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: #aeb9c9;
+    }
+
+    .card {
+      position: relative;
+      border: 1px solid rgba(148,163,184,.12);
+      border-radius: 16px;
+      padding: 13px 14px 13px 52px;
+      margin-bottom: 10px;
+      background: linear-gradient(180deg, rgba(18,31,51,.95), rgba(12,23,40,.95));
+      box-shadow: 0 12px 22px rgba(0,0,0,.16);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .card:hover {
+      transform: translateY(-1px);
+      border-color: rgba(85, 212, 151, .38);
+      box-shadow: 0 16px 30px rgba(0,0,0,.22);
+    }
+    .card::before {
+      content: "⚡";
+      position: absolute;
+      left: 14px;
+      top: 17px;
+      width: 28px;
+      height: 28px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: #082019;
+      font-size: 14px;
+      background: linear-gradient(135deg, rgba(85,212,151,.95), rgba(56,189,248,.95));
+    }
+    .card h4 {
+      margin: 0 0 5px;
+      font-size: 14px;
+      line-height: 1.25;
+      color: #f1f5f9;
+    }
+    .card p {
+      margin: 4px 0;
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: #8694a8;
+    }
+    .card p strong { color: #cbd5e1; }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 9px 0 8px;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 900;
+      background: rgba(56,189,248,.11);
+      border: 1px solid rgba(56,189,248,.13);
+      color: #a7e7ff;
+    }
+    .tag.status-tersedia { background: rgba(85,212,151,.12); border-color: rgba(85,212,151,.24); color: var(--accent); }
+    .tag.status-sibuk { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.24); color: #fbbf24; }
+    .tag.status-offline { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.24); color: #fb7185; }
+
+    .route-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      margin-top: 8px;
+      padding: 8px 11px;
+      border-radius: 11px;
+      background: rgba(85,212,151,.13);
+      border: 1px solid rgba(85,212,151,.22);
+      color: #bff4d8;
+      text-decoration: none;
+      font-size: 11.5px;
+      font-weight: 900;
+    }
+    .route-link::before { content: "➜"; }
+    .route-link:hover { background: rgba(85,212,151,.2); color: #fff; }
+
+    .note {
+      font-size: 11px;
+      color: #728198;
+      line-height: 1.45;
+      margin: 14px 2px 0;
+    }
+
+    .map-wrap { position: relative; min-width: 0; min-height: 0; }
+    #map { width: 100%; height: 100%; min-height: 520px; background: #182236; }
+    #map .leaflet-tile-pane { filter: saturate(.55) brightness(.78) contrast(1.08); }
+
+    .legend {
+      position: absolute;
+      z-index: 900;
+      left: 18px;
+      bottom: 18px;
+      background: rgba(8,17,31,.91);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(148,163,184,.17);
+      border-radius: 16px;
+      padding: 11px 13px;
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      line-height: 1.8;
+      color: #aeb9c9;
+    }
+    .legend strong { color: #e2e8f0; }
+
+    .map-note {
+      position: absolute;
+      z-index: 899;
+      right: 18px;
+      bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 13px;
+      border-radius: 16px;
+      background: rgba(8,17,31,.90);
+      border: 1px solid rgba(148,163,184,.17);
+      box-shadow: var(--shadow);
+      color: #aeb9c9;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      margin-right: 7px;
+      vertical-align: middle;
+      box-shadow: 0 0 12px currentColor;
+    }
+    .dot.available { background: var(--available); color: var(--available); }
+    .dot.busy { background: var(--busy); color: var(--busy); }
+    .dot.offline { background: var(--offline); color: var(--offline); }
+    .dot.user { background: var(--accent-2); color: var(--accent-2); }
+
+    .marker-dot {
+      width: 30px;
+      height: 30px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,.9);
+      box-shadow: 0 12px 26px rgba(0,0,0,.38), 0 0 0 5px rgba(8,17,31,.22);
+      display: grid;
+      place-items: center;
+      color: #082019;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .marker-dot::after { content: "⚡"; }
+    .marker-available { background: var(--available); }
+    .marker-busy { background: var(--busy); }
+    .marker-offline { background: var(--offline); color: #fff; }
+    .marker-unknown { background: var(--unknown); }
+    .marker-user { background: var(--accent-2); color: #06283a; border-radius: 999px; }
+    .marker-user::after { content: "●"; }
+
+    .leaflet-control-zoom {
+      border: 0 !important;
+      box-shadow: var(--shadow) !important;
+    }
+    .leaflet-control-zoom a {
+      width: 44px !important;
+      height: 44px !important;
+      line-height: 44px !important;
+      color: #dbe7f3 !important;
+      background: rgba(8,17,31,.94) !important;
+      border-color: rgba(148,163,184,.15) !important;
+    }
+    .leaflet-bar a:first-child { border-radius: 14px 14px 0 0 !important; }
+    .leaflet-bar a:last-child { border-radius: 0 0 14px 14px !important; }
+
+    .leaflet-popup-content-wrapper {
+      background: rgba(8,17,31,.97);
+      color: #dbe7f3;
+      border: 1px solid rgba(148,163,184,.16);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+    .leaflet-popup-tip { background: rgba(8,17,31,.97); }
+    .leaflet-popup-content {
+      min-width: 310px;
+      max-width: 360px;
+      margin: 17px 18px;
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: #aeb9c9;
+    }
+    .leaflet-popup-content strong { color: #e2e8f0; }
+    .popup-title {
+      margin: 0 0 7px;
+      font-size: 20px;
+      line-height: 1.16;
+      font-weight: 900;
+      color: #f8fafc;
+    }
+    .leaflet-popup-close-button {
+      width: 30px !important;
+      height: 30px !important;
+      border-radius: 10px !important;
+      top: 10px !important;
+      right: 10px !important;
+      color: #94a3b8 !important;
+      background: rgba(148,163,184,.10) !important;
+    }
+
+
+
+    /* Light theme: aktif saat tombol tema diubah */
+    body.light-theme {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --panel-3: #eef2f7;
+      --border: rgba(15, 23, 42, 0.12);
+      --text: #0f172a;
+      --muted: #64748b;
+      --muted-2: #475569;
+      --accent: #16a56a;
+      --accent-2: #0284c7;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --available: #16a56a;
+      --busy: #d97706;
+      --offline: #dc2626;
+      --unknown: #64748b;
+      --shadow: 0 18px 38px rgba(15, 23, 42, 0.15);
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    body.light-theme .shell {
+      background:
+        radial-gradient(circle at top left, rgba(22, 165, 106, 0.13), transparent 34%),
+        radial-gradient(circle at top right, rgba(2, 132, 199, 0.11), transparent 28%),
+        var(--bg);
+    }
+
+    body.light-theme .topbar {
+      background: rgba(255, 255, 255, 0.94);
+      border-bottom-color: var(--border);
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10);
+    }
+
+    body.light-theme .brand h1 { color: #0f5132; }
+    body.light-theme .brand p,
+    body.light-theme .stat-label,
+    body.light-theme .panel-title,
+    body.light-theme label,
+    body.light-theme .results h3 { color: #64748b; }
+
+    body.light-theme .brand-icon {
+      color: #063b26;
+      background: linear-gradient(135deg, #7ee2ad, #8bdcff);
+      box-shadow: 0 0 24px rgba(22, 165, 106, 0.20);
+    }
+
+    body.light-theme .live-badge {
+      background: rgba(22, 165, 106, 0.10);
+      border-color: rgba(22, 165, 106, 0.22);
+      color: var(--accent);
+    }
+
+    body.light-theme .refresh-btn,
+    body.light-theme .theme-toggle {
+      color: #334155;
+      background: rgba(248, 250, 252, 0.95);
+      border-color: rgba(15, 23, 42, 0.13);
+    }
+
+    body.light-theme .refresh-btn:hover,
+    body.light-theme .theme-toggle:hover {
+      border-color: rgba(22, 165, 106, 0.40);
+      color: #0f172a;
+      background: #ffffff;
+    }
+
+    body.light-theme aside {
+      background: rgba(255, 255, 255, 0.98);
+      border-right-color: var(--border);
+      box-shadow: 18px 0 38px rgba(15, 23, 42, 0.08);
+      scrollbar-color: rgba(22, 165, 106, 0.45) rgba(226, 232, 240, 0.8);
+    }
+
+    body.light-theme aside::-webkit-scrollbar-track { background: rgba(226, 232, 240, 0.8); }
+    body.light-theme aside::-webkit-scrollbar-thumb { background: rgba(22, 165, 106, 0.45); }
+
+    body.light-theme .filter-card,
+    body.light-theme .info-box,
+    body.light-theme .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.96));
+      border-color: var(--border);
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.07);
+    }
+
+    body.light-theme select,
+    body.light-theme input {
+      background: #ffffff;
+      color: #0f172a;
+      border-color: rgba(15, 23, 42, 0.13);
+      box-shadow: inset 0 1px 0 rgba(15,23,42,.02);
+    }
+
+    body.light-theme select option { color: #0f172a; background: #ffffff; }
+    body.light-theme input::placeholder { color: #94a3b8; }
+    body.light-theme select:focus,
+    body.light-theme input:focus {
+      border-color: rgba(22,165,106,.72);
+      box-shadow: 0 0 0 3px rgba(22, 165, 106, 0.11);
+    }
+
+    body.light-theme .quick-pill {
+      background: #ffffff;
+      border-color: rgba(15, 23, 42, 0.12);
+      color: #475569;
+    }
+
+    body.light-theme .quick-pill.active {
+      color: var(--accent);
+      border-color: rgba(22,165,106,.34);
+      background: rgba(22,165,106,.08);
+    }
+
+    body.light-theme .status-strip {
+      border-bottom-color: rgba(15,23,42,.10);
+    }
+
+    body.light-theme .mini-stat { color: #64748b; }
+    body.light-theme .mini-stat b,
+    body.light-theme .card p strong,
+    body.light-theme .legend strong,
+    body.light-theme .leaflet-popup-content strong,
+    body.light-theme .info-box strong { color: #0f172a; }
+
+    body.light-theme .info-box,
+    body.light-theme .card p,
+    body.light-theme .note,
+    body.light-theme .legend,
+    body.light-theme .map-note,
+    body.light-theme .leaflet-popup-content { color: #475569; }
+
+    body.light-theme .info-box span { color: #64748b !important; }
+    body.light-theme .card h4,
+    body.light-theme .popup-title { color: #0f172a; }
+
+    body.light-theme .map-popup-btn {
+      color: #0f5132;
+      background: rgba(22,165,106,.09);
+      border-color: rgba(22,165,106,.26);
+    }
+
+    body.light-theme .btn-secondary {
+      background: rgba(2,132,199,.09);
+      color: #0369a1;
+      border-color: rgba(2,132,199,.18);
+    }
+
+    body.light-theme .btn-secondary:hover {
+      background: rgba(2,132,199,.14);
+      color: #075985;
+    }
+
+    body.light-theme .btn-muted {
+      background: rgba(15,23,42,.04);
+      color: #475569;
+      border-color: rgba(15,23,42,.10);
+    }
+
+    body.light-theme .btn-muted:hover { background: rgba(15,23,42,.07); }
+
+    body.light-theme .tag {
+      background: rgba(2,132,199,.08);
+      border-color: rgba(2,132,199,.13);
+      color: #0369a1;
+    }
+
+    body.light-theme .route-link {
+      background: rgba(22,165,106,.09);
+      border-color: rgba(22,165,106,.20);
+      color: #047857;
+    }
+
+    body.light-theme .route-link:hover {
+      background: rgba(22,165,106,.15);
+      color: #065f46;
+    }
+
+    body.light-theme #map { background: #dbeafe; }
+    body.light-theme #map .leaflet-tile-pane { filter: none; }
+
+    body.light-theme .legend,
+    body.light-theme .map-note {
+      background: rgba(255,255,255,.92);
+      border-color: rgba(15,23,42,.13);
+      box-shadow: var(--shadow);
+    }
+
+    body.light-theme .leaflet-control-zoom a {
+      color: #0f172a !important;
+      background: rgba(255,255,255,.94) !important;
+      border-color: rgba(15,23,42,.13) !important;
+    }
+
+    body.light-theme .leaflet-popup-content-wrapper {
+      background: rgba(255,255,255,.97);
+      color: #0f172a;
+      border-color: rgba(15,23,42,.13);
+      box-shadow: var(--shadow);
+    }
+
+    body.light-theme .leaflet-popup-tip { background: rgba(255,255,255,.97); }
+    body.light-theme .leaflet-popup-close-button {
+      color: #64748b !important;
+      background: rgba(15,23,42,.06) !important;
+    }
+
+    .theme-toggle {
+      min-height: auto;
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 980px) {
+      body { overflow: auto; }
+      .shell { min-height: 100vh; height: auto; grid-template-rows: auto auto; }
+      .topbar { grid-template-columns: 1fr; height: auto; gap: 12px; }
+      .top-stats { justify-content: space-between; }
+      .stat-box { min-width: auto; flex: 1; padding: 0 8px; }
+      .top-actions { justify-content: flex-start; }
+      .app { grid-template-columns: 1fr; }
+      aside { max-height: none; border-right: 0; border-bottom: 1px solid var(--border); }
+      #map { height: 66vh; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div>
+          <h1>EV PlugPoint</h1>
+          <p>Daerah Istimewa Yogyakarta</p>
+        </div>
+      </div>
+
+      <div class="top-stats">
+        <div class="stat-box">
+          <span class="stat-value" id="totalCount">0</span>
+          <span class="stat-label">Total SPKLU Cocok</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value" id="availableCount">0</span>
+          <span class="stat-label">Tersedia</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value" id="nearestDistance">-</span>
+          <span class="stat-label">Jarak Terdekat</span>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <div class="live-badge">Live Update</div>
+        <button class="refresh-btn theme-toggle" id="themeToggleBtn" type="button" aria-label="Ubah tema tampilan">🌙 Dark</button>
+        <button class="refresh-btn" id="topRefreshBtn" type="button">↻ Refresh</button>
+      </div>
+    </header>
+
+    <main class="app">
+      <aside>
+        <h2 class="panel-title">Cari Stasiun</h2>
+
+        <div class="filter-card">
+          <div class="form-group search-wrap">
+            <label for="stationSearch">Nama stasiun/lokasi</label>
+            <input id="stationSearch" type="text" placeholder="Nama stasiun, lokasi..." />
+          </div>
+          <div class="form-group">
+            <label for="vehicleSelect">Pilih kendaraan listrik</label>
+            <select id="vehicleSelect"></select>
+          </div>
+          <div class="form-group">
+            <label for="regionSelect">Kabupaten/Kota</label>
+            <select id="regionSelect">
+              <option value="Semua">Semua Kabupaten/Kota</option>
+              <option value="Kota Yogyakarta">Kota Yogyakarta</option>
+              <option value="Sleman">Sleman</option>
+              <option value="Bantul">Bantul</option>
+              <option value="Kulon Progo">Kulon Progo</option>
+              <option value="Gunungkidul">Gunungkidul</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="quick-filters" aria-label="Status SPKLU">
+          <span class="quick-pill active">☰ Semua</span>
+          <span class="quick-pill">✅ Tersedia</span>
+          <span class="quick-pill busy">▣ Sibuk</span>
+          <span class="quick-pill offline">⛔ Offline</span>
+        </div>
+
+        <div class="filter-card">
+          <div class="row">
+            <div class="form-group">
+              <label for="chargingMode">Mode</label>
+              <select id="chargingMode">
+                <option value="auto">Otomatis</option>
+                <option value="AC">AC charging</option>
+                <option value="DC">DC fast</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="connectorSelect">Konektor</label>
+              <select id="connectorSelect">
+                <option value="auto">Otomatis</option>
+                <option value="Type 2">AC Type 2</option>
+                <option value="CCS2">CCS2</option>
+                <option value="CHAdeMO">CHAdeMO</option>
+                <option value="GB/T">GB/T</option>
+                <option value="Semua">Semua konektor</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="form-group">
+              <label for="minPowerSelect">Minimal Daya</label>
+              <select id="minPowerSelect">
+                <option value="0">Semua daya</option>
+                <option value="7.7">≥ 7,7 kW</option>
+                <option value="22">≥ 22 kW</option>
+                <option value="50">≥ 50 kW</option>
+                <option value="100">≥ 100 kW</option>
+                <option value="200">≥ 200 kW</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="statusSelect">Status</label>
+              <select id="statusSelect">
+                <option value="Tersedia">Tersedia</option>
+                <option value="Semua">Semua status</option>
+                <option value="Sibuk">Sibuk/penuh</option>
+                <option value="Offline">Offline</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="accessSelect">Akses</label>
+            <select id="accessSelect">
+              <option value="Semua">Semua akses</option>
+              <option value="Publik">Publik</option>
+              <option value="Terbatas">Terbatas</option>
+            </select>
+          </div>
+
+          <div class="button-row">
+            <button class="btn-secondary" id="locateBtn" type="button">⌖ Lokasi Saya</button>
+            <button class="btn-primary" id="filterBtn" type="button">Cari Rekomendasi</button>
+          </div>
+          <button class="btn-muted" id="resetBtn" type="button">Reset Filter</button>
+        </div>
+
+        <div class="status-strip">
+          <div class="mini-stat"><span class="dot available"></span><b>14</b> Tersedia</div>
+          <div class="mini-stat"><span class="dot busy"></span><b>5</b> Sibuk</div>
+          <div class="mini-stat"><span class="dot offline"></span><b>3</b> Offline</div>
+        </div>
+
+        <div class="info-box" id="vehicleInfo">
+          Pilih kendaraan untuk melihat kebutuhan konektor dan rekomendasi SPKLU yang sesuai.
+        </div>
+
+        <div class="results">
+          <h3>Rekomendasi SPKLU</h3>
+          <div id="recommendationList"></div>
+        </div>
+
+        <p class="note">
+          Status tersedia, sibuk, dan offline pada WebGIS ini masih berupa data statis/simulasi awal. Untuk penggunaan operasional, status dapat dihubungkan ke API atau sumber real-time.
+        </p>
+      </aside>
+
+      <section class="map-wrap">
+        <div id="map"></div>
+        <div class="legend">
+          <strong>Legenda</strong><br>
+          <span class="dot available"></span>Tersedia<br>
+          <span class="dot busy"></span>Sibuk/penuh<br>
+          <span class="dot offline"></span>Offline<br>
+          <span class="dot user"></span>Posisi pengguna
+        </div>
+        <div class="map-note" id="mapThemeNote">🌙 Dark <span style="color:#64748b">|</span> Leaflet © OSM</div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const vehicles = [
+      { id: 'wuling-air-ev', brand: 'Wuling', model: 'Air EV', voltage: '115 V class', battery: '17,3–26,7 kWh', ac: 'GB/T', dc: null, defaultConnector: 'GB/T', note: 'Umumnya lebih cocok charging AC/rumah; penggunaan SPKLU publik Type 2/CCS2 perlu adaptor atau port yang sesuai.' },
+      { id: 'wuling-binguo', brand: 'Wuling', model: 'BinguoEV', voltage: 'Tidak dipublikasikan detail', battery: '31,9–37,9 kWh', ac: 'GB/T', dc: 'GB/T', defaultConnector: 'GB/T', note: 'Pastikan tipe port unit karena sebagian SPKLU umum memakai Type 2/CCS2.' },
+      { id: 'wuling-cloud', brand: 'Wuling', model: 'Cloud EV', voltage: 'Tidak dipublikasikan detail', battery: '50,6 kWh', ac: 'Type 2 / GB/T', dc: 'CCS2 / GB/T', defaultConnector: 'CCS2', note: 'Cek varian unit. Versi Type 2/CCS2 lebih mudah menggunakan SPKLU publik.' },
+      { id: 'byd-dolphin', brand: 'BYD', model: 'Dolphin', voltage: '400 V class', battery: '44,9–60,4 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'byd-atto3', brand: 'BYD', model: 'Atto 3', voltage: '400 V class', battery: '49,9–60,5 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'byd-seal', brand: 'BYD', model: 'Seal', voltage: '400–800 V class', battery: '61,4–82,5 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Optimal pada fast/ultra-fast charger CCS2.' },
+      { id: 'byd-m6', brand: 'BYD', model: 'M6', voltage: 'Tidak dipublikasikan detail', battery: '55,4–71,8 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'hyundai-ioniq5', brand: 'Hyundai', model: 'IONIQ 5', voltage: '800 V architecture', battery: '58–84 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Optimal pada ultra-fast charger CCS2.' },
+      { id: 'hyundai-ioniq6', brand: 'Hyundai', model: 'IONIQ 6', voltage: '800 V architecture', battery: '53–77,4 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Optimal pada ultra-fast charger CCS2.' },
+      { id: 'hyundai-kona', brand: 'Hyundai', model: 'Kona Electric', voltage: '400 V class', battery: '48,6–64,8 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'kia-ev6', brand: 'Kia', model: 'EV6', voltage: '800 V architecture', battery: '77,4 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Optimal pada ultra-fast charger CCS2.' },
+      { id: 'mg4', brand: 'MG', model: 'MG4 EV', voltage: '400 V class', battery: '51–64 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'mg-zs', brand: 'MG', model: 'ZS EV', voltage: '400 V class', battery: '50,3–72,6 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'neta-v', brand: 'Neta', model: 'V / V-II', voltage: 'Tidak dipublikasikan detail', battery: '36,1–40,7 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'chery-omoda-e5', brand: 'Chery', model: 'Omoda E5', voltage: '±370–400 V class', battery: '61,06 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'chery-j6', brand: 'Chery', model: 'J6', voltage: 'Tidak dipublikasikan detail', battery: '65,69–69,77 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'vinfast-vf', brand: 'VinFast', model: 'VF 5 / VF e34', voltage: 'Tidak dipublikasikan detail', battery: '29,6–41,9 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'nissan-leaf', brand: 'Nissan', model: 'Leaf', voltage: '400 V class', battery: '40–62 kWh', ac: 'Type 2', dc: 'CHAdeMO', defaultConnector: 'CHAdeMO', note: 'AC Type 2 bisa digunakan; DC fast charging membutuhkan CHAdeMO.' },
+      { id: 'mercedes-eq', brand: 'Mercedes-Benz', model: 'EQA/EQB/EQE/EQS', voltage: '400 V class', battery: '66,5–108,4 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' },
+      { id: 'bmw-i', brand: 'BMW', model: 'iX1/iX/i4/i5/i7', voltage: '400 V class', battery: '64,7–105,7 kWh', ac: 'Type 2', dc: 'CCS2', defaultConnector: 'CCS2', note: 'Kompatibel dengan SPKLU Type 2/CCS2.' }
+    ];
+
+    const stations = [
+      { id: 1, name: 'Istana Gedung Agung Yogyakarta', category: 'Eksklusif & hotel', access: 'Terbatas', address: 'Jl. Ahmad Yani, Ngupasan, Gondomanan', area: 'Ngupasan', district: 'Gondomanan', city: 'Kota Yogyakarta', powerText: 'DC ultra fast ±100 kW + 100 kW', maxPower: 100, connectors: ['CCS2'], units: '1 unit; 2 output 100 kW', status: 'Tersedia', lat: -7.8012, lng: 110.3649 },
+      { id: 2, name: 'SPKLU RISS Hotel Malioboro', category: 'Eksklusif & hotel', access: 'Publik', address: 'Jl. Gowongan Kidul, Sosromenduran, Gedong Tengen', area: 'Sosromenduran', district: 'Gedong Tengen', city: 'Kota Yogyakarta', powerText: 'AC 22 kW', maxPower: 22, connectors: ['Type 2'], units: '2 unit/lokasi menurut data RRI', status: 'Tersedia', lat: -7.7893, lng: 110.3642 },
+      { id: 3, name: 'SPKLU Hotel Khas Tugu Yogyakarta', category: 'Eksklusif & hotel', access: 'Publik', address: 'Jl. Pangeran Diponegoro No.99, Bumijo, Jetis', area: 'Bumijo', district: 'Jetis', city: 'Kota Yogyakarta', powerText: 'AC 22 kW', maxPower: 22, connectors: ['Type 2'], units: '1 unit', status: 'Sibuk', lat: -7.7841, lng: 110.3660 },
+      { id: 4, name: 'Hotel Tentrem Yogyakarta', category: 'Eksklusif & hotel', access: 'Publik', address: 'Jl. P. Mangkubumi No.72A, Cokrodiningratan, Jetis', area: 'Cokrodiningratan', district: 'Jetis', city: 'Kota Yogyakarta', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.7743, lng: 110.3680 },
+      { id: 5, name: 'Hotel New Saphir Yogyakarta', category: 'Eksklusif & hotel', access: 'Publik', address: 'Jl. Laksda Adisucipto No.38, Demangan, Gondokusuman', area: 'Demangan', district: 'Gondokusuman', city: 'Kota Yogyakarta', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Offline', lat: -7.7828, lng: 110.3890 },
+      { id: 6, name: 'SPKLU Hotel Royal Ambarrukmo', category: 'Eksklusif & hotel', access: 'Publik', address: 'Jl. Laksda Adisucipto No.81, Caturtunggal, Depok', area: 'Caturtunggal', district: 'Depok', city: 'Sleman', powerText: 'DC ultra fast ±100 kW + 100 kW', maxPower: 100, connectors: ['CCS2', 'CHAdeMO'], units: '1 unit; 2 output 100 kW', status: 'Tersedia', lat: -7.7820, lng: 110.4015 },
+      { id: 7, name: 'SPKLU Hotel Merapi Merbabu', category: 'Eksklusif & hotel', access: 'Publik', address: 'Jl. Seturan Raya, Kledokan, Caturtunggal, Depok', area: 'Caturtunggal', district: 'Depok', city: 'Sleman', powerText: 'AC 22 kW', maxPower: 22, connectors: ['Type 2'], units: '1 unit', status: 'Tersedia', lat: -7.7696, lng: 110.4104 },
+      { id: 8, name: 'SPKLU Hotel Ramada Yogyakarta', category: 'Eksklusif & hotel', access: 'Publik', address: 'Jl. Magelang KM 14, Caturharjo', area: 'Caturharjo', district: 'Sleman', city: 'Sleman', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.6819, lng: 110.3364 },
+      { id: 9, name: 'SPKLU Hotel Morazen Yogyakarta', category: 'Eksklusif & hotel', access: 'Publik', address: 'Jl. Nasional III KM 41.5, Temon', area: 'Temon', district: 'Temon', city: 'Kulon Progo', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.8895, lng: 110.0547 },
+      { id: 10, name: 'SPKLU PLN UP3 Yogyakarta / SPKLU Center', category: 'Jaringan PLN', access: 'Publik', address: 'Jl. Gedongkuning No.3, Tegal Tandan, Banguntapan', area: 'Tegal Tandan', district: 'Banguntapan', city: 'Bantul', powerText: 'Ultra fast charger + standard charger + SPKLU roda dua', maxPower: 200, connectors: ['CCS2', 'CHAdeMO', 'Type 2'], units: '8 ultra fast/16 konektor; 1 standard; 1 SPKLU roda dua', status: 'Tersedia', lat: -7.8131, lng: 110.4026 },
+      { id: 11, name: 'SPKLU PLN ULP Bantul', category: 'Jaringan PLN', access: 'Publik', address: 'Jl. Dr. Wahidin Sudiro Husodo, Karangbayam, Bantul', area: 'Karangbayam', district: 'Bantul', city: 'Bantul', powerText: 'DC/AC fast charging 60 kW + 60 kW + 22 kW', maxPower: 60, connectors: ['CCS2', 'CHAdeMO', 'Type 2'], units: '1 unit', status: 'Tersedia', lat: -7.8891, lng: 110.3299 },
+      { id: 12, name: 'SPKLU PLN ULP Sedayu', category: 'Jaringan PLN', access: 'Publik', address: 'Jl. Wates KM 11, Argorejo, Sedayu', area: 'Argorejo', district: 'Sedayu', city: 'Bantul', powerText: 'AC standard 7,7 kW', maxPower: 7.7, connectors: ['Type 2'], units: '1 unit', status: 'Tersedia', lat: -7.8051, lng: 110.2612 },
+      { id: 13, name: 'SPKLU PLN ULP Sleman', category: 'Jaringan PLN', access: 'Publik', address: 'Jl. Parasamya, Beran Kidul, Tridadi', area: 'Tridadi', district: 'Sleman', city: 'Sleman', powerText: 'AC standard 7,7 kW', maxPower: 7.7, connectors: ['Type 2'], units: '1 unit', status: 'Sibuk', lat: -7.7155, lng: 110.3541 },
+      { id: 14, name: 'SPKLU PLN ULP Kalasan', category: 'Jaringan PLN', access: 'Publik', address: 'Jl. Raya Solo-Yogyakarta KM 15, Kalasan', area: 'Kalasan', district: 'Kalasan', city: 'Sleman', powerText: 'AC standard 7,7 kW', maxPower: 7.7, connectors: ['Type 2'], units: '1 unit', status: 'Tersedia', lat: -7.7673, lng: 110.4706 },
+      { id: 15, name: 'SPKLU PLN ULP Wates', category: 'Jaringan PLN', access: 'Publik', address: 'Jl. KH Ahmad Dahlan, Wates', area: 'Wates', district: 'Wates', city: 'Kulon Progo', powerText: 'DC ultra fast ±100 kW + 100 kW; AC 22 kW', maxPower: 100, connectors: ['CCS2', 'CHAdeMO', 'Type 2'], units: '2 unit', status: 'Tersedia', lat: -7.8570, lng: 110.1584 },
+      { id: 16, name: 'SPKLU PLN ULP Wonosari', category: 'Jaringan PLN', access: 'Publik', address: 'Jl. Kolonel Sugiyono No.5, Wonosari', area: 'Wonosari', district: 'Wonosari', city: 'Gunungkidul', powerText: 'AC standard 7,7 kW', maxPower: 7.7, connectors: ['Type 2'], units: '1 unit', status: 'Tersedia', lat: -7.9666, lng: 110.6042 },
+      { id: 17, name: 'Hyundai Adisucipto', category: 'Dealer / brand kendaraan', access: 'Terbatas', address: 'Karangploso, Maguwoharjo, Depok', area: 'Maguwoharjo', district: 'Depok', city: 'Sleman', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['CCS2', 'Type 2'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.7848, lng: 110.4261 },
+      { id: 18, name: 'Hyundai Mlati', category: 'Dealer / brand kendaraan', access: 'Terbatas', address: 'Kutu Tegal, Sinduadi, Mlati', area: 'Sinduadi', district: 'Mlati', city: 'Sleman', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['CCS2', 'Type 2'], units: 'Belum tercantum', status: 'Sibuk', lat: -7.7412, lng: 110.3592 },
+      { id: 19, name: 'AJM Yogyakarta (Wuling)', category: 'Dealer / brand kendaraan', access: 'Terbatas', address: 'Jl. Ring Road Utara No.67, Nayan, Maguwoharjo, Depok', area: 'Maguwoharjo', district: 'Depok', city: 'Sleman', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['GB/T', 'Type 2'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.7590, lng: 110.4247 },
+      { id: 20, name: 'AJM Mlati (Wuling)', category: 'Dealer / brand kendaraan', access: 'Terbatas', address: 'Jl. Magelang, Jongke Tengah, Sendangadi, Mlati', area: 'Sendangadi', district: 'Mlati', city: 'Sleman', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['GB/T', 'Type 2'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.7339, lng: 110.3629 },
+      { id: 21, name: 'Nasmoco Bantul', category: 'Dealer / brand kendaraan', access: 'Terbatas', address: 'Jl. Ringroad Selatan, Jadan, Tamantirto, Kasihan', area: 'Tamantirto', district: 'Kasihan', city: 'Bantul', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Type 2', 'CCS2'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.8307, lng: 110.3334 },
+      { id: 22, name: 'BYD Jogja (Arista Power)', category: 'Dealer / brand kendaraan', access: 'Terbatas', address: 'Jl. Magelang KM 5,5, Kutu Tegal, Sinduadi, Mlati', area: 'Sinduadi', district: 'Mlati', city: 'Sleman', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['CCS2', 'Type 2'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.7478, lng: 110.3618 },
+      { id: 23, name: 'Transmart Yogyakarta', category: 'Mall & fasilitas umum', access: 'Publik', address: 'Jl. Raya Solo KM 8, Kalongan, Maguwoharjo, Depok', area: 'Maguwoharjo', district: 'Depok', city: 'Sleman', powerText: 'AC 22 kW', maxPower: 22, connectors: ['Type 2'], units: '2 unit/lokasi menurut data RRI', status: 'Tersedia', lat: -7.7831, lng: 110.4260 },
+      { id: 24, name: 'Jogja City Mall', category: 'Mall & fasilitas umum', access: 'Publik', address: 'Jl. Magelang KM 6 No.18, Kutu Patran, Sinduadi, Mlati', area: 'Sinduadi', district: 'Mlati', city: 'Sleman', powerText: 'Fast charging disebutkan; detail kW belum tercantum', maxPower: 50, connectors: ['CCS2', 'Type 2'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.7521, lng: 110.3607 },
+      { id: 25, name: 'Barsa City Yogyakarta', category: 'Mall & fasilitas umum', access: 'Publik', address: 'Jl. Laksda Adisucipto KM 7, Janti, Caturtunggal, Depok', area: 'Caturtunggal', district: 'Depok', city: 'Sleman', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Offline', lat: -7.7836, lng: 110.4154 },
+      { id: 26, name: 'RS Islam Yogyakarta PDHI', category: 'Mall & fasilitas umum', access: 'Publik', address: 'Jl. Jogja-Solo KM 12,5, Tirtomartani, Kalasan', area: 'Tirtomartani', district: 'Kalasan', city: 'Sleman', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.7742, lng: 110.4750 },
+      { id: 27, name: 'SPKLU PT Bagas Setto Anggoro', category: 'Mall & fasilitas umum', access: 'Publik', address: 'Jl. Kebun Raya No.1F, Rejowinangun, Kotagede', area: 'Rejowinangun', district: 'Kotagede', city: 'Kota Yogyakarta', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.8140, lng: 110.3982 },
+      { id: 28, name: '(iGreen+) 107 Yogyakarta', category: 'Mall & fasilitas umum', access: 'Publik', address: 'Brontokusuman, Kota Yogyakarta', area: 'Brontokusuman', district: 'Mergangsan', city: 'Kota Yogyakarta', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.8173, lng: 110.3744 },
+      { id: 29, name: 'SPKLU Drini Hills', category: 'Kawasan wisata', access: 'Publik', address: 'Jl. Pantai Selatan Jawa, Banjarejo, Tanjungsari', area: 'Banjarejo', district: 'Tanjungsari', city: 'Gunungkidul', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Tersedia', lat: -8.1370, lng: 110.5778 },
+      { id: 30, name: 'SPKLU Candi Prambanan', category: 'Kawasan wisata', access: 'Publik', address: 'Jl. Raya Solo-Yogyakarta No.16', area: 'Prambanan', district: 'Prambanan', city: 'Sleman', powerText: 'Belum tercantum pada sumber', maxPower: 0, connectors: ['Belum terverifikasi'], units: 'Belum tercantum', status: 'Tersedia', lat: -7.7520, lng: 110.4915 }
+    ];
+
+    const map = L.map('map', { zoomControl: false }).setView([-7.802, 110.365], 10);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let markerLayer = L.layerGroup().addTo(map);
+    let markerRegistry = {};
+    let userMarker = null;
+    let userPosition = null;
+    let activeResults = [...stations];
+
+    const vehicleSelect = document.getElementById('vehicleSelect');
+    const chargingMode = document.getElementById('chargingMode');
+    const connectorSelect = document.getElementById('connectorSelect');
+    const minPowerSelect = document.getElementById('minPowerSelect');
+    const statusSelect = document.getElementById('statusSelect');
+    const regionSelect = document.getElementById('regionSelect');
+    const accessSelect = document.getElementById('accessSelect');
+
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const mapThemeNote = document.getElementById('mapThemeNote');
+
+    function setTheme(theme) {
+      const isLight = theme === 'light';
+      document.body.classList.toggle('light-theme', isLight);
+      document.body.classList.toggle('dark-theme', !isLight);
+      themeToggleBtn.textContent = isLight ? '☀️ Light' : '🌙 Dark';
+      mapThemeNote.innerHTML = `${isLight ? '☀️ Light' : '🌙 Dark'} <span style="color:#64748b">|</span> Leaflet © OSM`;
+      try { localStorage.setItem('spkluTheme', isLight ? 'light' : 'dark'); } catch (e) {}
+      setTimeout(() => map.invalidateSize(), 120);
+    }
+
+    function initTheme() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('spkluTheme') || 'dark'; } catch (e) {}
+      setTheme(savedTheme === 'light' ? 'light' : 'dark');
+    }
+
+    const stationSearch = document.getElementById('stationSearch');
+    const vehicleInfo = document.getElementById('vehicleInfo');
+    const recommendationList = document.getElementById('recommendationList');
+
+    function populateVehicles() {
+      vehicleSelect.innerHTML = vehicles.map(v => `<option value="${v.id}">${v.brand} ${v.model}</option>`).join('');
+      updateVehicleInfo();
+    }
+
+    function getSelectedVehicle() {
+      return vehicles.find(v => v.id === vehicleSelect.value) || vehicles[0];
+    }
+
+    function getNeededConnector() {
+      const vehicle = getSelectedVehicle();
+      if (connectorSelect.value !== 'auto') return connectorSelect.value;
+      if (chargingMode.value === 'AC') return vehicle.ac && vehicle.ac.includes('Type 2') ? 'Type 2' : vehicle.ac;
+      if (chargingMode.value === 'DC') return vehicle.dc || vehicle.defaultConnector;
+      return vehicle.defaultConnector;
+    }
+
+    function updateVehicleInfo() {
+      const v = getSelectedVehicle();
+      const needed = getNeededConnector();
+      vehicleInfo.innerHTML = `
+        <strong>${v.brand} ${v.model}</strong><br>
+        Kelas baterai: ${v.voltage}<br>
+        Kapasitas baterai: ${v.battery}<br>
+        Charger AC: ${v.ac || '-'} | Charger DC: ${v.dc || '-'}<br>
+        Kebutuhan filter saat ini: <strong>${needed || 'Belum ditentukan'}</strong><br>
+        <span style="color:#64748b">${v.note}</span>
+      `;
+    }
+
+    function iconForStatus(status) {
+      let cls = 'marker-unknown';
+      if (status === 'Tersedia') cls = 'marker-available';
+      if (status === 'Sibuk') cls = 'marker-busy';
+      if (status === 'Offline') cls = 'marker-offline';
+      return L.divIcon({ className: '', html: `<div class="marker-dot ${cls}"></div>`, iconSize: [20,20], iconAnchor: [10,10], popupAnchor: [0,-10] });
+    }
+
+    function routeUrl(station) {
+      if (userPosition) {
+        return `https://www.google.com/maps/dir/?api=1&origin=${userPosition.lat},${userPosition.lng}&destination=${station.lat},${station.lng}&travelmode=driving`;
+      }
+      return `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}&travelmode=driving`;
+    }
+
+    function popupHtml(station) {
+      const connectorTags = station.connectors.map(c => `<span class="tag">${c}</span>`).join(' ');
+      const distance = userPosition ? `<br><strong>Jarak:</strong> ${distanceKm(userPosition.lat, userPosition.lng, station.lat, station.lng).toFixed(2)} km` : '';
+      return `
+        <div class="popup-title">${station.name}</div>
+        <strong>Status:</strong> ${station.status}<br>
+        <strong>Wilayah:</strong> ${station.city}, ${station.district}<br>
+        <strong>Alamat:</strong> ${station.address}<br>
+        <strong>Daya:</strong> ${station.powerText}<br>
+        <strong>Akses:</strong> ${station.access}<br>
+        <strong>Konektor:</strong><br>${connectorTags}${distance}<br>
+        <a class="route-link" target="_blank" rel="noopener" href="${routeUrl(station)}">Buka rute di Google Maps</a>
+      `;
+    }
+
+    function focusStation(stationId, openPopup = true) {
+      const station = activeResults.find(s => s.id === stationId) || stations.find(s => s.id === stationId);
+      if (!station) return;
+      map.setView([station.lat, station.lng], Math.max(map.getZoom(), 14), { animate: true });
+      const marker = markerRegistry[station.id];
+      if (marker && openPopup) {
+        marker.setPopupContent(popupHtml(station));
+        setTimeout(() => marker.openPopup(), 180);
+      }
+    }
+
+    function renderMarkers(data, autoOpen = true) {
+      markerLayer.clearLayers();
+      markerRegistry = {};
+      data.forEach(station => {
+        const marker = L.marker([station.lat, station.lng], { icon: iconForStatus(station.status) })
+          .bindPopup(popupHtml(station))
+          .addTo(markerLayer);
+        markerRegistry[station.id] = marker;
+      });
+
+      if (data.length > 0) {
+        const bounds = L.latLngBounds(data.map(s => [s.lat, s.lng]));
+        if (userPosition) bounds.extend([userPosition.lat, userPosition.lng]);
+        map.fitBounds(bounds, { padding: [35, 35] });
+
+        // Setelah kriteria kendaraan/filter diisi, otomatis tampilkan rekomendasi pertama
+        // dan buka popup informasi stasiun pada peta.
+        if (autoOpen) {
+          setTimeout(() => focusStation(data[0].id, true), 450);
+        }
+      }
+    }
+
+    function normalizeText(text) {
+      return (text || '').toString().toLowerCase().trim();
+    }
+
+    function isConnectorCompatible(station, needed) {
+      if (!needed || needed === 'Semua') return true;
+      if (needed.includes('/')) {
+        return needed.split('/').some(part => station.connectors.includes(part.trim()));
+      }
+      return station.connectors.includes(needed);
+    }
+
+    function applyFilters() {
+      updateVehicleInfo();
+      const needed = getNeededConnector();
+      const minPower = parseFloat(minPowerSelect.value || '0');
+      const status = statusSelect.value;
+      const region = regionSelect.value;
+      const access = accessSelect.value;
+      const q = normalizeText(stationSearch.value);
+
+      let results = stations.filter(station => {
+        const matchConnector = isConnectorCompatible(station, needed);
+        const matchPower = minPower === 0 || station.maxPower >= minPower;
+        const matchStatus = status === 'Semua' || station.status === status;
+        const matchRegion = region === 'Semua' || station.city === region;
+        const matchAccess = access === 'Semua' || station.access === access;
+        const searchable = normalizeText(`${station.name} ${station.address} ${station.area} ${station.district} ${station.city} ${station.category}`);
+        const matchSearch = q === '' || searchable.includes(q);
+        return matchConnector && matchPower && matchStatus && matchRegion && matchAccess && matchSearch;
+      });
+
+      if (userPosition) {
+        results = results.map(station => ({
+          ...station,
+          distance: distanceKm(userPosition.lat, userPosition.lng, station.lat, station.lng)
+        })).sort((a,b) => a.distance - b.distance);
+      } else {
+        results = results.sort((a,b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
+      }
+
+      activeResults = results;
+      renderMarkers(results);
+      renderRecommendations(results, needed);
+      updateSummary(results);
+    }
+
+    function updateSummary(results) {
+      document.getElementById('totalCount').textContent = results.length;
+      document.getElementById('availableCount').textContent = results.filter(s => s.status === 'Tersedia').length;
+      if (userPosition && results.length > 0 && results[0].distance !== undefined) {
+        document.getElementById('nearestDistance').textContent = results[0].distance.toFixed(1) + ' km';
+      } else {
+        document.getElementById('nearestDistance').textContent = '-';
+      }
+    }
+
+    function renderRecommendations(results, needed) {
+      if (results.length === 0) {
+        recommendationList.innerHTML = `
+          <div class="card">
+            <h4>Tidak ada SPKLU yang cocok</h4>
+            <p>Coba ubah konektor ke “Semua”, turunkan minimal daya, atau pilih status “Semua status”. Untuk kendaraan GB/T, lokasi publik mungkin terbatas dan perlu verifikasi adaptor/konektor.</p>
+          </div>
+        `;
+        return;
+      }
+
+      recommendationList.innerHTML = results.slice(0, 7).map((s, idx) => {
+        const dist = s.distance !== undefined ? `<p><strong>Jarak:</strong> ${s.distance.toFixed(2)} km dari posisi Anda</p>` : '';
+        const statusClass = s.status === 'Tersedia' ? 'status-tersedia' : s.status === 'Sibuk' ? 'status-sibuk' : 'status-offline';
+        return `
+          <div class="card recommendation-card" onclick="focusStation(${s.id}, true)">
+            <h4>${idx + 1}. ${s.name}</h4>
+            <p><strong>${s.city}</strong> — ${s.address}</p>
+            <p><strong>Daya:</strong> ${s.powerText}</p>
+            ${dist}
+            <div class="tag-row">
+              <span class="tag ${statusClass}">${s.status}</span>
+              <span class="tag">${s.access}</span>
+              ${s.connectors.map(c => `<span class="tag">${c}</span>`).join('')}
+            </div>
+            <p><strong>Alasan rekomendasi:</strong> cocok dengan kebutuhan konektor ${needed || 'yang dipilih'}${s.maxPower > 0 ? ` dan mendukung daya hingga ${s.maxPower} kW` : ', namun detail daya perlu diverifikasi'}.</p>
+            <button class="map-popup-btn" type="button" onclick="event.stopPropagation(); focusStation(${s.id}, true)">Tampilkan lokasi & popup informasi</button>
+            <a class="route-link" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="${routeUrl(s)}">Arahkan rute ke Google Maps</a>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function distanceKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    function toRad(deg) { return deg * Math.PI / 180; }
+
+    function locateUser() {
+      if (!navigator.geolocation) {
+        alert('Browser tidak mendukung geolocation.');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(pos => {
+        userPosition = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        };
+        if (userMarker) map.removeLayer(userMarker);
+        const userIcon = L.divIcon({ className: '', html: '<div class="marker-dot marker-user"></div>', iconSize: [20,20], iconAnchor: [10,10] });
+        userMarker = L.marker([userPosition.lat, userPosition.lng], { icon: userIcon })
+          .bindPopup('<strong>Posisi Anda</strong><br>Digunakan untuk menghitung rekomendasi SPKLU terdekat.')
+          .addTo(map);
+        applyFilters();
+      }, err => {
+        alert('Lokasi tidak dapat diakses. Izinkan akses lokasi pada browser atau gunakan pencarian wilayah secara manual.');
+      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    }
+
+    function resetFilters() {
+      vehicleSelect.value = vehicles[0].id;
+      chargingMode.value = 'auto';
+      connectorSelect.value = 'auto';
+      minPowerSelect.value = '0';
+      statusSelect.value = 'Tersedia';
+      regionSelect.value = 'Semua';
+      accessSelect.value = 'Semua';
+      stationSearch.value = '';
+      applyFilters();
+    }
+
+    vehicleSelect.addEventListener('change', applyFilters);
+    chargingMode.addEventListener('change', applyFilters);
+    connectorSelect.addEventListener('change', applyFilters);
+    minPowerSelect.addEventListener('change', applyFilters);
+    statusSelect.addEventListener('change', applyFilters);
+    regionSelect.addEventListener('change', applyFilters);
+    accessSelect.addEventListener('change', applyFilters);
+    stationSearch.addEventListener('input', applyFilters);
+    document.getElementById('filterBtn').addEventListener('click', applyFilters);
+    document.getElementById('locateBtn').addEventListener('click', locateUser);
+    document.getElementById('resetBtn').addEventListener('click', resetFilters);
+    document.getElementById('topRefreshBtn').addEventListener('click', applyFilters);
+    themeToggleBtn.addEventListener('click', () => {
+      const nextTheme = document.body.classList.contains('light-theme') ? 'dark' : 'light';
+      setTheme(nextTheme);
+    });
+
+    initTheme();
+    populateVehicles();
+    applyFilters();
+  </script>
+</body>
+</html>
